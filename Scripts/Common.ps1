@@ -48,10 +48,10 @@ function Get-AzureSdkPath {
 
 function Get-SqlPackageExePath
 {
-    $MSSQLx64Directory = "$env:ProgramFiles\Microsoft SQL Server"
+    $MSSQLx64Directory = "${env:ProgramFiles}\Microsoft SQL Server"
     $MSSQLx86Directory = "${env:ProgramFiles(x86)}\Microsoft SQL Server"
 
-    Write-Host "$env:ProgramFiles\Microsoft SQL Server";
+    Write-Host "${env:ProgramFiles}\Microsoft SQL Server";
     Write-Host "${env:ProgramFiles(x86)}\Microsoft SQL Server";
 
     if(Test-Path $MSSQLx64Directory)
