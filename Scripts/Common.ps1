@@ -51,11 +51,10 @@ function Get-SqlPackageExePath
     $MSSQLx64Directory = "${env:ProgramFiles}\Microsoft SQL Server"
     $MSSQLx86Directory = "${env:ProgramFiles(x86)}\Microsoft SQL Server"
 
-    Write-Host "Program files path is => ${env:COMMONPROGRAMFILES}"
-    Write-Host "Program files path is => ${env:programfiles}"
-
-    Write-Host "${env:ProgramFiles}\Microsoft SQL Server";
-    Write-Host "${env:ProgramFiles(x86)}\Microsoft SQL Server";
+    if($MSSQLx64Directory -eq $MSSQLx86Directory)
+    {
+        $MSSQLx64Directory = "${env:ProgramW6432}\Microsoft SQL Server"
+    }
 
     if(Test-Path $MSSQLx64Directory)
     {
