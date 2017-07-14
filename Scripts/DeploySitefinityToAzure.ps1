@@ -13,7 +13,7 @@
 	  $licenseVersion = "9.1",
       $accountLocation = "West Europe",
 	  $createIrisUser = "false")
-      
+
 . "$PSScriptRoot\Modules.ps1"
 
 $serviceName = $serviceName.ToLower()
@@ -34,10 +34,11 @@ $sqlConfig = $config.azure.sql | Where-Object { $_.location -eq $accountLocation
 Write-Host "Sql server is set to : $($sqlConfig.server)"
 $sqlConnectionUser = $sqlConfig.user
 $sqlConnectionServer = $sqlConfig.server
-$sqlConnectionUsername = "$sqlConnectionUser@$sqlConnectionServer" 
+$sqlConnectionUsername = "$sqlConnectionUser@$sqlConnectionServer"
 
 try
 {
+    $acc = CreateStorageAccount $storageAccountName $accountLocation
     $serviceDefinitionPath = Resolve-Path "$PSScriptRoot\$($config.files.serviceDefinition)"
     $cloudConfigPath = Resolve-Path "$PSScriptRoot\$($config.files.cloudConfig)"
     $subscriptionPublishSettingsPath = Resolve-Path "$PSScriptRoot\$($config.files.subscriptionPublishSettings)"
@@ -46,7 +47,7 @@ try
     $certificatePath = Resolve-Path "$PSScriptRoot\$($config.certificate.path)"
 
 	Write-Host "Cleaning up Azure Subscriptions"
-	Get-AzureSubscription | % { Remove-AzureSubscription $_.SubscriptionName -Force } 
+	Get-AzureSubscription | % { Remove-AzureSubscription $_.SubscriptionName -Force }
 
     Write-Host "Cleaning up temp Azure Powershell Files from $azureTempFilesDir"
     Get-ChildItem $azureTempFilesDir | % { Remove-Item $_.FullName }
@@ -54,17 +55,15 @@ try
 	Write-Host "Generating license with following parameters: $licenseDomains $licenseVersion $licenseTargetDirectory"
 	GetSitefinityLicense -domains $licenseDomains -version $licenseVersion -licenseFilePath $licenseTargetDirectory
 
-    #configure powershell with publishsettings for your subscription
-    Import-AzurePublishSettingsFile $subscriptionPublishSettingsPath
     Set-AzureSubscription -CurrentStorageAccountName $storageAccountName -SubscriptionName $config.azure.subscription
     Select-AzureSubscription -SubscriptionName $config.azure.subscription
     $subscription = Get-AzureSubscription $config.azure.subscription
 
     LogMessage "Azure Cloud Service deploy script started."
     LogMessage "Preparing deployment of $deploymentLabel for $($subscription.subscriptionname) with Subscription ID $($subscription.subscriptionid)."
-    
+
     if($deployDatabase -eq "true")
-    {        
+    {
         DeleteAzureDatabase $sqlConfig.serverName $databaseName $sqlConfig.user $sqlConfig.password
 
         $generatedCredentials = GenerateUniqueAdminCredentials $sqlServer $databaseName
@@ -78,15 +77,15 @@ try
 			GenerateAdminCredentials $sqlServer $databaseName $config.iris.adminUsername $config.iris.adminPassword
 		}
 
-	    CreateDatabasePackage $sqlServer $databaseName $bacpacDatabaseFile 
+	    CreateDatabasePackage $sqlServer $databaseName $bacpacDatabaseFile
 	    DeployDatabasePackage $bacpacDatabaseFile $databaseName $sqlConfig.server $sqlConnectionUsername $sqlConfig.password
-	    UpdateSQLAzureServerInfoData $databaseName $databaseName             
+	    UpdateSQLAzureServerInfoData $databaseName $databaseName
     }
     else
     {
         Write-Host "Deploy Database parameter set to: $deployDatabase. Skipping database deployment..."
     }
-    
+
     #Copies all startup task scripts to the website binaries directory.
 	robocopy $azureStartupTaskScripts $startupTasksTargetDirectory
 
@@ -102,7 +101,7 @@ try
     }
 
 	UpdateSitefinityDataConfig $websiteRootDirectory $sqlConfig.server $sqlConnectionUsername $sqlConfig.password $databaseName
-    
+
     if($enableRedisCache -eq "true")
     {
         #The AzureResourceManager module requires Add-AzureAccount. A Publish Settings file is not sufficient.
@@ -116,13 +115,12 @@ try
         LogMessage "RedisCache connection string: '$redisCacheConnectionString'"
         . "$PSScriptRoot\..\..\CommonScripts\PowerShell\Common\SitefinitySetup\ConfigureRedisCache.ps1" $systemConfigPath $redisCacheConnectionString
     }
-    
+
 	$serv = CreateCloudService $serviceName $accountLocation
-	$acc = CreateStorageAccount $storageAccountName $accountLocation
 	UpdateAzureSubscriptionData $acc.AccountName  $serv.ServiceName  $acc.AccountName $accountLocation
 	UpdateServiceConfigurationCloudData $acc.AccountName $acc.AccessKey
     if($enableSsl -eq "true" -or $enableRemoteDesktopAccess -eq "true")
-    {        
+    {
        AddCertificateToService $serviceName $certificatePath $config.certificate.password
        AddCertificatesNode
     } else {
@@ -131,7 +129,7 @@ try
     ConfigureSsl -EnableSsl $enableSsl
     ConfigureRemoteDesktop -EnableRemoteDesktopAccess $enableRemoteDesktopAccess
 	UpdateVMSize -ServiceDefinitionPath "$serviceDefinitionPath" -VMSize $vmSize
-             
+
     CreatePackage $serviceDefinitionPath $azurePackage $websiteRootDirectory $config.azure.roleName $rolePropertiesPath
     Publish $serv.ServiceName $acc.AccountName $azurePackage $cloudConfigPath $config.azure.environment $deploymentLabel $config.azure.timeStampFormat $config.azure.alwaysDeleteExistingDeployments $config.azure.enableDeploymentUpgrade $config.azure.subscription $subscriptionPublishSettingsPath
 
@@ -153,7 +151,7 @@ try
     if($enableDiagnostics -eq "true")
     {
         LogMessage "Setting AzureServiceDiagnosticsExtension..."
-        $storageContext = New-AzureStorageContext -StorageAccountName $storageAccountName -StorageAccountKey $config.azure.storageAccountKey   
+        $storageContext = New-AzureStorageContext -StorageAccountName $storageAccountName -StorageAccountKey $config.azure.storageAccountKey
         Set-AzureServiceDiagnosticsExtension -ServiceName $serviceName -DiagnosticsConfigurationPath $diagnosticsConfigPath -StorageContext $storageContext -Role $config.azure.roleName
     }
 }
